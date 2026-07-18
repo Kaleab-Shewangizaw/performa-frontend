@@ -108,6 +108,7 @@ function SalesDashboard({ currency }) {
 }
 
 function SupervisorDashboard({ currency }) {
+  const navigate = useNavigate()
   const { data, isLoading, isError, refetch } = useDashboard('supervisor')
   if (isLoading) return <DashboardSkeleton />
   if (isError) return <ErrorState onRetry={refetch} />
@@ -124,8 +125,8 @@ function SupervisorDashboard({ currency }) {
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Pending Reviews</CardTitle>
-          <Button size="sm" variant="outline" asChild={false}>
-            <Link to="/approvals">View all</Link>
+          <Button size="sm" variant="outline" onClick={() => navigate('/approvals')}>
+            View all
           </Button>
         </CardHeader>
         <CardContent className="p-0">
@@ -137,6 +138,7 @@ function SupervisorDashboard({ currency }) {
 }
 
 function AdminDashboard({ currency }) {
+  const navigate = useNavigate()
   const { data, isLoading, isError, refetch } = useDashboard('admin')
   if (isLoading) return <DashboardSkeleton />
   if (isError) return <ErrorState onRetry={refetch} />
@@ -159,8 +161,8 @@ function AdminDashboard({ currency }) {
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Awaiting Final Approval</CardTitle>
-          <Button size="sm" variant="outline" asChild={false}>
-            <Link to="/approvals">Review queue</Link>
+          <Button size="sm" variant="outline" onClick={() => navigate('/approvals')}>
+            Review queue
           </Button>
         </CardHeader>
         <CardContent className="p-0">
