@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, useFieldArray, useWatch } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
@@ -25,6 +25,18 @@ function num(v) {
 function ItemRow({ index, control, register, remove, products, setValue }) {
   const item = useWatch({ control, name: `items.${index}` })
   const product = products.find((p) => p.id === item?.productId)
+
+  // Keep thickness valid for the selected product. Must run after the
+  // <option> list renders — setting it inside the product onChange races
+  // the uncontrolled select's options and silently leaves it empty.
+  useEffect(() => {
+    if (!product) return
+    const current = num(item?.thickness)
+    if (!product.thicknessOptions.includes(current)) {
+      setValue(`items.${index}.thickness`, String(product.thicknessOptions[0]))
+    }
+  }, [product, item?.thickness, index, setValue])
+
   const area = num(item?.width) * num(item?.height)
   const unitPrice = item?.unitPrice !== '' && item?.unitPrice != null
     ? num(item.unitPrice)
@@ -36,15 +48,13 @@ function ItemRow({ index, control, register, remove, products, setValue }) {
       <div className="col-span-2 space-y-1 md:col-span-3">
         <Label className="text-xs">Product</Label>
         <Select
-          {...register(`items.${index}.productId`, { required: true })}
-          onChange={(e) => {
-            const prod = products.find((p) => p.id === e.target.value)
-            setValue(`items.${index}.productId`, e.target.value)
-            if (prod) {
-              setValue(`items.${index}.thickness`, String(prod.thicknessOptions[0]))
-              setValue(`items.${index}.unitPrice`, prod.defaultUnitPrice)
-            }
-          }}
+          {...register(`items.${index}.productId`, {
+            required: true,
+            onChange: (e) => {
+              const prod = products.find((p) => p.id === e.target.value)
+              if (prod) setValue(`items.${index}.unitPrice`, prod.defaultUnitPrice)
+            },
+          })}
         >
           <option value="">Select product…</option>
           {products.map((p) => (

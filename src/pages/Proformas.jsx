@@ -34,7 +34,7 @@ export default function ProformasPage() {
     <div>
       <PageHeader title="Proformas" description="Proforma invoices and their approval status">
         {(isSales || isAdmin) && (
-          <Button asChild={false} onClick={() => navigate('/proformas/new')}>
+          <Button onClick={() => navigate('/proformas/new')}>
             <Plus className="h-4 w-4" /> New Proforma
           </Button>
         )}
