@@ -31,7 +31,7 @@ function RevenueChart({ data, currency }) {
           return (
             <div
               key={`${d.year}-${d.month}`}
-              className="relative flex h-full flex-1 cursor-pointer flex-col justify-end"
+              className="relative flex h-full max-w-24 flex-1 cursor-pointer flex-col justify-end"
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
             >
@@ -55,7 +55,7 @@ function RevenueChart({ data, currency }) {
       </div>
       <div className="mt-1 flex gap-2 px-2">
         {data.map((d) => (
-          <p key={`${d.year}-${d.month}`} className="flex-1 truncate text-center text-xs text-muted-foreground">
+          <p key={`${d.year}-${d.month}`} className="max-w-24 flex-1 truncate text-center text-xs text-muted-foreground">
             {MONTHS[d.month - 1]}
           </p>
         ))}
