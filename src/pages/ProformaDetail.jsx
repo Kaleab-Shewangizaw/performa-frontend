@@ -132,9 +132,11 @@ export default function ProformaDetailPage() {
   const currency = settings?.currency || 'ETB'
   const c = proforma.customer || {}
   const isOwner = (proforma.salesPerson?.id || proforma.salesPerson) === user?.id
+  // Sales edit their own until approved; admins can edit at any stage,
+  // including after final approval.
   const canEdit =
     (isSales && isOwner && ['draft', 'pending', 'rejected'].includes(proforma.status)) ||
-    (isAdmin && proforma.status !== 'approved')
+    isAdmin
   const canApprove =
     (isSupervisor && proforma.status === 'pending') ||
     (isAdmin && ['pending', 'supervisor_approved'].includes(proforma.status))

@@ -117,7 +117,6 @@ function ItemRow({ index, control, register, remove, products, setValue }) {
 export default function ProformaFormPage() {
   const { id } = useParams()
   const isEdit = !!id
-  const navigate = useNavigate()
   const { data: settings } = useSettings()
 
   const { data: customersData } = useQuery({
@@ -128,14 +127,33 @@ export default function ProformaFormPage() {
     queryKey: ['products', 'active'],
     queryFn: () => api.get('/products?status=active&limit=100').then((r) => r.data),
   })
-  const { data: existing, isLoading: loadingExisting } = useQuery({
+  const { data: existing } = useQuery({
     queryKey: ['proforma', id],
     queryFn: () => api.get(`/proformas/${id}`).then((r) => r.data.proforma),
     enabled: isEdit,
   })
 
-  const customers = customersData?.customers || []
-  const products = productsData?.products || []
+  // Mount the form only once every option list is loaded — react-hook-form
+  // applies `values` to uncontrolled selects via the DOM, so the <option>
+  // elements must exist first or the selects silently stay empty.
+  if (!customersData || !productsData || (isEdit && !existing)) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>
+  }
+
+  return (
+    <ProformaFormInner
+      id={id}
+      isEdit={isEdit}
+      existing={existing}
+      customers={customersData.customers}
+      products={productsData.products}
+      settings={settings}
+    />
+  )
+}
+
+function ProformaFormInner({ id, isEdit, existing, customers, products, settings }) {
+  const navigate = useNavigate()
   const currency = settings?.currency || 'ETB'
 
   const defaultValues = useMemo(() => {
@@ -207,10 +225,6 @@ export default function ProformaFormPage() {
     successMessage: isEdit ? 'Proforma updated' : 'Proforma created',
     onSuccess: (res) => navigate(`/proformas/${res.data.proforma.id}`),
   })
-
-  if (isEdit && loadingExisting) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-64" /><Skeleton className="h-96" /></div>
-  }
 
   return (
     <div className="max-w-5xl">
@@ -336,7 +350,11 @@ export default function ProformaFormPage() {
             loading={mutation.isPending}
             onClick={handleSubmit((data) => mutation.mutate({ asDraft: false, data }))}
           >
-            {isEdit ? 'Save & submit for approval' : 'Create & submit for approval'}
+            {!isEdit
+              ? 'Create & submit for approval'
+              : ['approved', 'supervisor_approved'].includes(existing?.status)
+                ? 'Save changes'
+                : 'Save & submit for approval'}
           </Button>
         </div>
       </form>
