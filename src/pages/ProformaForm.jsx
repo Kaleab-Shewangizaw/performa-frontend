@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus, Trash2, ArrowLeft } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useApiMutation, useSettings } from '@/hooks/useCrud'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, sameId } from '@/lib/utils'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,7 +24,7 @@ function num(v) {
 
 function ItemRow({ index, control, register, remove, products, setValue }) {
   const item = useWatch({ control, name: `items.${index}` })
-  const product = products.find((p) => p.id === item?.productId)
+  const product = products.find((p) => sameId(p.id, item?.productId))
 
   // Keep thickness valid for the selected product. Must run after the
   // <option> list renders — setting it inside the product onChange races
@@ -51,7 +51,7 @@ function ItemRow({ index, control, register, remove, products, setValue }) {
           {...register(`items.${index}.productId`, {
             required: true,
             onChange: (e) => {
-              const prod = products.find((p) => p.id === e.target.value)
+              const prod = products.find((p) => sameId(p.id, e.target.value))
               if (prod) setValue(`items.${index}.unitPrice`, prod.defaultUnitPrice)
             },
           })}
@@ -189,7 +189,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   const vatRate = vatRateRaw === '' || vatRateRaw == null ? (settings?.defaultVatRate ?? 15) : num(vatRateRaw)
 
   const subtotal = watchedItems.reduce((sum, item) => {
-    const product = products.find((p) => p.id === item?.productId)
+    const product = products.find((p) => sameId(p.id, item?.productId))
     const price = item?.unitPrice !== '' && item?.unitPrice != null
       ? num(item.unitPrice)
       : (product?.defaultUnitPrice ?? 0)
