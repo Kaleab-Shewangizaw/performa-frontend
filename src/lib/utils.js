@@ -5,6 +5,12 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs))
 }
 
+// Record ids are numbers from the API but arrive as strings from <select>
+// values and route params, so compare them stringly.
+export function sameId(a, b) {
+  return a != null && b != null && String(a) === String(b)
+}
+
 export function formatMoney(value, currency = 'ETB') {
   return `${Number(value || 0).toLocaleString('en-US', {
     minimumFractionDigits: 2,
