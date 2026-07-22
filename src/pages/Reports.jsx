@@ -86,7 +86,7 @@ export default function ReportsPage() {
       : null
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <PageHeader title="Reports" description="Revenue and approval analytics from approved proformas" />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">

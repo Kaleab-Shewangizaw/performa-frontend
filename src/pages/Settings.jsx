@@ -53,7 +53,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="mx-auto w-full max-w-4xl">
       <PageHeader title="Settings" description="Company information and proforma defaults" />
       <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-6">
         <Card>

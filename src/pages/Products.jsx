@@ -26,7 +26,8 @@ function ProductFormDialog({ open, onClose, product, meta }) {
       ? { ...product, defaultUnitPrice: product.defaultUnitPrice }
       : {
           name: '', stoneCategory: meta.stoneCategories[0], stoneColor: '',
-          finish: meta.finishes[0], thicknessOptions: [20], defaultUnitPrice: '', status: 'active',
+          finish: meta.finishes[0], thicknessOptions: [20], defaultUnitPrice: '',
+          status: 'active', allowsDirectApproval: false,
         },
   })
   const thicknesses = watch('thicknessOptions') || []
@@ -44,6 +45,7 @@ function ProductFormDialog({ open, onClose, product, meta }) {
         ...data,
         defaultUnitPrice: Number(data.defaultUnitPrice),
         thicknessOptions: data.thicknessOptions,
+        allowsDirectApproval: !!data.allowsDirectApproval,
       }
       return isEdit ? api.put(`/products/${product.id}`, payload) : api.post('/products', payload)
     },
@@ -123,6 +125,18 @@ function ProductFormDialog({ open, onClose, product, meta }) {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </Select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-md border p-3">
+              <input type="checkbox" className="mt-0.5 h-4 w-4" {...register('allowsDirectApproval')} />
+              <span className="text-sm">
+                <span className="font-medium">Direct approval</span>
+                <span className="block text-xs text-muted-foreground">
+                  A proforma whose items are all pre-approved products is approved
+                  immediately, skipping supervisor and admin review.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
         <DialogFooter>
@@ -225,9 +239,16 @@ export default function ProductsPage() {
                     {formatMoney(p.defaultUnitPrice, currency)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={p.status === 'active' ? 'success' : 'secondary'}>
-                      {p.status}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant={p.status === 'active' ? 'success' : 'secondary'}>
+                        {p.status}
+                      </Badge>
+                      {p.allowsDirectApproval && (
+                        <Badge variant="info" title="Skips supervisor and admin review">
+                          Direct approval
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   {isAdmin && (
                     <TableCell className="text-right">

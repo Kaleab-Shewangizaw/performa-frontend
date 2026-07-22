@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, useFieldArray, useWatch } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, ArrowLeft, Ruler } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Ruler, Zap } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useApiMutation, useSettings, useProductMeta } from '@/hooks/useCrud'
 import { formatMoney, sameId } from '@/lib/utils'
@@ -201,6 +201,7 @@ export default function ProformaFormPage() {
 function ProformaFormInner({ id, isEdit, existing, customers, products, settings, meta }) {
   const navigate = useNavigate()
   const currency = settings?.currency || 'ETB'
+  const standardVat = settings?.defaultVatRate ?? 15
 
   const defaultValues = existing
     ? {
@@ -232,7 +233,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
       }
     : {
         customerId: '', orderNumber: '', materialType: '', orderedBy: '', orderedDate: '',
-        projectName: '', discount: 0, vatRate: '', paymentTerms: '', deliveryTime: '',
+        projectName: '', discount: 0, vatRate: standardVat, paymentTerms: '', deliveryTime: '',
         validityPeriod: '', totalWeight: '', remark: '', notes: '',
         items: [{ ...EMPTY_AREA_ITEM }],
       }
@@ -244,7 +245,8 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   const watchedItems = useWatch({ control, name: 'items' }) || []
   const discount = num(useWatch({ control, name: 'discount' }))
   const vatRateRaw = useWatch({ control, name: 'vatRate' })
-  const vatRate = vatRateRaw === '' || vatRateRaw == null ? (settings?.defaultVatRate ?? 15) : num(vatRateRaw)
+  // VAT is all-or-nothing: the company's standard rate, or waived.
+  const vatRate = num(vatRateRaw) > 0 ? standardVat : 0
 
   const subtotal = watchedItems.reduce(
     (sum, item) => sum + computeItem(item, products).lineTotal,
@@ -264,7 +266,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
         orderedDate: data.orderedDate || null,
         projectName: data.projectName || '',
         discount: num(data.discount),
-        ...(data.vatRate !== '' && data.vatRate != null ? { vatRate: num(data.vatRate) } : {}),
+        vatRate: num(data.vatRate) > 0 ? standardVat : 0,
         paymentTerms: data.paymentTerms || undefined,
         deliveryTime: data.deliveryTime || undefined,
         validityPeriod: data.validityPeriod || undefined,
@@ -296,8 +298,15 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
 
   const lockedStatus = ['approved', 'supervisor_approved'].includes(existing?.status)
 
+  // Every line pre-cleared means the proforma is approved on submission.
+  const allDirect =
+    watchedItems.length > 0 &&
+    watchedItems.every((i) =>
+      products.find((p) => sameId(p.id, i?.productId))?.allowsDirectApproval === true
+    )
+
   return (
-    <div className="max-w-6xl">
+    <div className="w-full">
       <Button variant="ghost" size="sm" className="mb-2" onClick={() => navigate(-1)}>
         <ArrowLeft className="h-4 w-4" /> Back
       </Button>
@@ -397,9 +406,11 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
                     <Input type="number" step="0.01" min="0" {...register('discount')} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>VAT Rate (%)</Label>
-                    <Input type="number" step="0.1" min="0" max="100"
-                      placeholder={String(settings?.defaultVatRate ?? 15)} {...register('vatRate')} />
+                    <Label>VAT</Label>
+                    <Select {...register('vatRate')}>
+                      <option value={standardVat}>Apply VAT ({standardVat}%)</option>
+                      <option value={0}>No VAT (0%) — exempt customer</option>
+                    </Select>
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -438,6 +449,16 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
             </div>
           </CardContent>
         </Card>
+
+        {allDirect && !isEdit && (
+          <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            <Zap className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Every item is a pre-approved product, so this proforma will be approved
+              immediately on submission — no supervisor or admin review needed.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-wrap justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>

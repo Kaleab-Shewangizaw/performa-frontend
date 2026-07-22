@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowLeft, FileDown, Pencil, Trash2, Check, X, Send, History,
+  ArrowLeft, FileDown, Pencil, Trash2, Check, X, Send, History, Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, apiErrorMessage, storage } from '@/lib/api'
@@ -34,6 +34,7 @@ const ACTION_LABELS = {
   admin_approved: 'gave final approval',
   rejected: 'rejected',
   reverted_to_draft: 'reverted to draft',
+  auto_approved: 'approved automatically (pre-approved products)',
 }
 
 function DecisionDialog({ open, onClose, mode, onConfirm, loading }) {
@@ -138,10 +139,11 @@ export default function ProformaDetailPage() {
   const currency = settings?.currency || 'ETB'
   const c = proforma.customer || {}
   const isOwner = (proforma.salesPerson?.id || proforma.salesPerson) === user?.id
-  // Sales edit their own until approved; admins can edit at any stage,
-  // including after final approval.
+  // Sales edit their own until approved; supervisors edit any proforma up to
+  // final approval; admins can edit at any stage, including after approval.
   const canEdit =
     (isSales && isOwner && ['draft', 'pending', 'rejected'].includes(proforma.status)) ||
+    (isSupervisor && ['draft', 'pending', 'supervisor_approved', 'rejected'].includes(proforma.status)) ||
     isAdmin
   const canApprove =
     (isSupervisor && proforma.status === 'pending') ||
@@ -152,7 +154,7 @@ export default function ProformaDetailPage() {
   const canDelete = isAdmin || (isSales && isOwner && proforma.status === 'draft')
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       <Button variant="ghost" size="sm" className="mb-2" onClick={() => navigate('/proformas')}>
         <ArrowLeft className="h-4 w-4" /> All proformas
       </Button>
@@ -199,6 +201,16 @@ export default function ProformaDetailPage() {
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <span className="font-semibold">Rejection reason: </span>
           {proforma.rejectionReason}
+        </div>
+      )}
+
+      {proforma.autoApproved && (
+        <div className="mb-6 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+          <Zap className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <span className="font-semibold">Approved automatically. </span>
+            All items are pre-approved products, so no supervisor or admin review was required.
+          </p>
         </div>
       )}
 
