@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, useFieldArray, useWatch } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Trash2, ArrowLeft, Ruler, Zap } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Zap } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useApiMutation, useSettings, useProductMeta } from '@/hooks/useCrud'
 import { formatMoney, sameId } from '@/lib/utils'
@@ -14,145 +14,158 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
-const EMPTY_AREA_ITEM = {
-  itemType: 'area', description: '', productId: '', length: '', width: '',
-  thickness: '', quantity: 1, unitPrice: '', remark: '',
+const EMPTY_ITEM = {
+  description: '', length: '', width: '', thickness: '',
+  quantity: 1, unitPrice: '', remark: '',
 }
-const EMPTY_LINEAR_ITEM = {
-  itemType: 'linear', description: '', productId: '', length: '', width: '',
-  thickness: '', quantity: 1, unitPrice: '', remark: '',
-}
+
+// Column widths shared by the header strip and every item row, so the grid
+// lines up like a spreadsheet.
+const GRID =
+  'grid grid-cols-1 gap-2 md:grid-cols-[minmax(130px,1.7fr)_minmax(62px,0.7fr)_minmax(62px,0.7fr)_minmax(64px,0.7fr)_minmax(72px,0.8fr)_minmax(52px,0.5fr)_minmax(76px,0.8fr)_minmax(88px,1fr)_minmax(96px,1.05fr)_minmax(110px,1.2fr)_32px] md:items-center md:gap-1.5'
 
 function num(v) {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
 }
 
-// Mirrors the server: measurements keep precision, money rounds to 2dp.
-function computeItem(item, products) {
-  const product = products.find((p) => sameId(p.id, item?.productId))
-  const isLinear = item?.itemType === 'linear'
+// Mirrors the server: a line with no width is edge work billed per metre.
+function computeItem(item, product) {
   const quantity = num(item?.quantity) || 0
   const totalLength = num(item?.length) * quantity
+  const isLinear = item?.width === '' || item?.width == null || num(item?.width) === 0
   const area = isLinear ? 0 : num(item?.length) * num(item?.width) * quantity
   const unitPrice =
     item?.unitPrice !== '' && item?.unitPrice != null
       ? num(item.unitPrice)
       : (product?.defaultUnitPrice ?? 0)
   const lineTotal = (isLinear ? totalLength : area) * unitPrice
-  return { product, isLinear, totalLength, area, unitPrice, lineTotal }
+  return { isLinear, totalLength, area, unitPrice, lineTotal }
 }
 
-function ItemRow({ index, control, register, remove, products, setValue, meta, currency }) {
+// Measurements show at natural precision (0.868, not 0.87).
+function trim(n, dp = 4) {
+  if (!n) return '—'
+  return String(Number(Number(n).toFixed(dp)))
+}
+
+function ItemsHeader() {
+  const cell = 'px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
+  return (
+    <div className={`${GRID} hidden border-b pb-1.5 md:grid`}>
+      <div className={cell}>Description</div>
+      <div className={`${cell} text-right`}>Length (m)</div>
+      <div className={`${cell} text-right`}>Width (m)</div>
+      <div className={`${cell} text-right`}>Thk (cm)</div>
+      <div className={`${cell} text-right`}>Tot. Len (m)</div>
+      <div className={`${cell} text-right`}>Qty</div>
+      <div className={`${cell} text-right`}>Tot. Area (m²)</div>
+      <div className={`${cell} text-right`}>Unit Price</div>
+      <div className={`${cell} text-right`}>Amount</div>
+      <div className={cell}>Remark</div>
+      <div />
+    </div>
+  )
+}
+
+function ItemRow({ index, control, register, remove, materialProduct, setValue, meta, canRemove }) {
   const item = useWatch({ control, name: `items.${index}` })
-  const { product, isLinear, totalLength, area, lineTotal } = computeItem(item, products)
+  const { isLinear, totalLength, area, lineTotal } = computeItem(item, materialProduct)
 
-  // Keep thickness valid for the selected product. Runs after the <option>
-  // list renders, which a change handler cannot guarantee.
+  // Prefill the material's usual thickness on a blank row; never overwrite a
+  // value the user typed, since any thickness is allowed.
   useEffect(() => {
-    if (!product || isLinear) return
-    const current = num(item?.thickness)
-    if (!product.thicknessOptions.includes(current)) {
-      setValue(`items.${index}.thickness`, String(product.thicknessOptions[0]))
+    if (!materialProduct || isLinear) return
+    if (item?.thickness === '' || item?.thickness == null) {
+      setValue(`items.${index}.thickness`, materialProduct.thicknessOptions[0] / 10)
     }
-  }, [product, isLinear, item?.thickness, index, setValue])
+  }, [materialProduct, isLinear, item?.thickness, index, setValue])
 
-  const suggestions = isLinear ? meta?.linearServices : meta?.elementTypes
+  const mobileLabel = 'text-xs text-muted-foreground md:hidden'
+  const readOnly =
+    'flex h-9 items-center justify-end rounded-md bg-muted px-2 text-sm font-medium tabular-nums'
+  const thicknesses = materialProduct?.thicknessOptions || meta?.thicknessOptions || []
 
   return (
-    <div className="rounded-lg border p-3">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-12 md:items-end">
-        <div className="space-y-1 md:col-span-2">
-          <Label className="text-xs">Type</Label>
-          <Select {...register(`items.${index}.itemType`)}>
-            <option value="area">Cut stone (m²)</option>
-            <option value="linear">Edge work (per m)</option>
-          </Select>
-        </div>
+    <div className={`${GRID} rounded-md border p-2 md:border-0 md:border-b md:p-0 md:pb-1.5`}>
+      <div>
+        <span className={mobileLabel}>Description</span>
+        <Input
+          list="element-types"
+          placeholder="Window sill"
+          className="h-9"
+          {...register(`items.${index}.description`, { required: true })}
+        />
+      </div>
 
-        <div className="space-y-1 md:col-span-3">
-          <Label className="text-xs">Description *</Label>
-          <Input
-            list={`elements-${index}`}
-            placeholder={isLinear ? 'Bullnose' : 'Window sill'}
-            {...register(`items.${index}.description`, { required: true })}
-          />
-          <datalist id={`elements-${index}`}>
-            {(suggestions || []).map((s) => <option key={s} value={s} />)}
-          </datalist>
-        </div>
+      <div>
+        <span className={mobileLabel}>Length (m)</span>
+        <Input type="number" step="0.001" min="0.001" className="h-9 text-right"
+          {...register(`items.${index}.length`, { required: true })} />
+      </div>
 
-        <div className="space-y-1 md:col-span-3">
-          <Label className="text-xs">Material {isLinear && <span className="text-muted-foreground">(optional)</span>}</Label>
-          <Select
-            {...register(`items.${index}.productId`, {
-              onChange: (e) => {
-                const prod = products.find((p) => sameId(p.id, e.target.value))
-                if (prod) setValue(`items.${index}.unitPrice`, prod.defaultUnitPrice)
-              },
-            })}
-          >
-            <option value="">—</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — {p.stoneCategory} ({p.finish})
-              </option>
-            ))}
-          </Select>
-        </div>
+      <div>
+        <span className={mobileLabel}>Width (m)</span>
+        <Input type="number" step="0.001" min="0" placeholder="—" className="h-9 text-right"
+          title="Leave empty for edge work priced per linear metre"
+          {...register(`items.${index}.width`)} />
+      </div>
 
-        <div className="space-y-1 md:col-span-2">
-          <Label className="text-xs">{isLinear ? 'Length (m)' : 'Length (m)'} *</Label>
-          <Input type="number" step="0.001" min="0.001"
-            {...register(`items.${index}.length`, { required: true })} />
-        </div>
+      <div>
+        <span className={mobileLabel}>Thickness (cm)</span>
+        <Input
+          type="number" step="0.1" min="0" placeholder="—"
+          className="h-9 px-1.5 text-right"
+          list={`thk-${index}`}
+          disabled={isLinear}
+          title="Any thickness in centimetres; the material's usual sizes are suggested"
+          {...register(`items.${index}.thickness`)}
+        />
+        <datalist id={`thk-${index}`}>
+          {thicknesses.map((t) => <option key={t} value={t / 10} />)}
+        </datalist>
+      </div>
 
-        <div className="space-y-1 md:col-span-2">
-          <Label className="text-xs">Width (m){!isLinear && ' *'}</Label>
-          <Input type="number" step="0.001" min="0.001" disabled={isLinear}
-            className={isLinear ? 'bg-muted' : ''}
-            {...register(`items.${index}.width`, { required: !isLinear })} />
-        </div>
+      <div>
+        <span className={mobileLabel}>Total Length (m)</span>
+        <div className={readOnly}>{trim(totalLength, 3)}</div>
+      </div>
 
-        <div className="space-y-1 md:col-span-2">
-          <Label className="text-xs">Thickness (cm)</Label>
-          <Select disabled={isLinear} className={isLinear ? 'bg-muted' : ''}
-            {...register(`items.${index}.thickness`, { required: !isLinear })}>
-            <option value="">—</option>
-            {(product?.thicknessOptions || meta?.thicknessOptions || []).map((t) => (
-              <option key={t} value={t}>{t / 10} cm</option>
-            ))}
-          </Select>
-        </div>
+      <div>
+        <span className={mobileLabel}>Quantity</span>
+        <Input type="number" min="1" step="1" className="h-9 px-1.5 text-right"
+          {...register(`items.${index}.quantity`, { required: true })} />
+      </div>
 
-        <div className="space-y-1 md:col-span-1">
-          <Label className="text-xs">Qty</Label>
-          <Input type="number" min="1" step="1"
-            {...register(`items.${index}.quantity`, { required: true })} />
-        </div>
+      <div>
+        <span className={mobileLabel}>Total Area (m²)</span>
+        <div className={readOnly}>{isLinear ? '—' : trim(area)}</div>
+      </div>
 
-        <div className="space-y-1 md:col-span-2">
-          <Label className="text-xs">Unit Price ({currency}) *</Label>
-          <Input type="number" step="0.01" min="0"
-            {...register(`items.${index}.unitPrice`, { required: true })} />
-        </div>
+      <div>
+        <span className={mobileLabel}>Unit Price</span>
+        <Input type="number" step="0.01" min="0" className="h-9 text-right"
+          {...register(`items.${index}.unitPrice`, { required: true })} />
+      </div>
 
-        <div className="space-y-1 md:col-span-3">
-          <Label className="text-xs">Remark</Label>
-          <Input placeholder="e.g. Bullnose and Groove" {...register(`items.${index}.remark`)} />
-        </div>
-
-        <div className="col-span-2 flex justify-end md:col-span-1">
-          <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+      <div>
+        <span className={mobileLabel}>Amount</span>
+        <div className={`${readOnly} font-semibold`}>
+          {lineTotal ? lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
-        <span>Total length: <b className="text-foreground">{totalLength ? totalLength.toFixed(3).replace(/\.?0+$/, '') : '—'} m</b></span>
-        <span>Total area: <b className="text-foreground">{isLinear ? '—' : (area ? area.toFixed(4).replace(/\.?0+$/, '') : '—')} m²</b></span>
-        <span className="ml-auto">Amount: <b className="text-foreground">{formatMoney(lineTotal, currency)}</b></span>
+      <div>
+        <span className={mobileLabel}>Remark</span>
+        <Input placeholder="Bullnose and Groove" className="h-9"
+          {...register(`items.${index}.remark`)} />
+      </div>
+
+      <div className="flex justify-end">
+        <Button type="button" variant="ghost" size="icon" className="h-9 w-8"
+          disabled={!canRemove} onClick={() => remove(index)}>
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
       </div>
     </div>
   )
@@ -206,8 +219,8 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   const defaultValues = existing
     ? {
         customerId: existing.customer?.id ?? '',
+        materialProductId: existing.items.find((i) => i.product)?.product ?? '',
         orderNumber: existing.orderNumber || '',
-        materialType: existing.materialType || '',
         orderedBy: existing.orderedBy || '',
         orderedDate: existing.orderedDate ? String(existing.orderedDate).slice(0, 10) : '',
         projectName: existing.projectName || '',
@@ -220,22 +233,21 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
         remark: existing.remark || '',
         notes: existing.notes || '',
         items: existing.items.map((i) => ({
-          itemType: i.itemType || 'area',
           description: i.description || '',
-          productId: i.product ?? '',
           length: i.length,
           width: i.width ?? '',
-          thickness: i.thickness != null ? String(i.thickness) : '',
+          // Stored in mm, edited in cm.
+          thickness: i.thickness != null ? i.thickness / 10 : '',
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           remark: i.remark || '',
         })),
       }
     : {
-        customerId: '', orderNumber: '', materialType: '', orderedBy: '', orderedDate: '',
+        customerId: '', materialProductId: '', orderNumber: '', orderedBy: '', orderedDate: '',
         projectName: '', discount: 0, vatRate: standardVat, paymentTerms: '', deliveryTime: '',
         validityPeriod: '', totalWeight: '', remark: '', notes: '',
-        items: [{ ...EMPTY_AREA_ITEM }],
+        items: [{ ...EMPTY_ITEM }],
       }
 
   const { register, handleSubmit, control, setValue, formState: { errors } } = useForm({
@@ -243,13 +255,15 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   const watchedItems = useWatch({ control, name: 'items' }) || []
+  const materialProductId = useWatch({ control, name: 'materialProductId' })
+  const materialProduct = products.find((p) => sameId(p.id, materialProductId))
   const discount = num(useWatch({ control, name: 'discount' }))
   const vatRateRaw = useWatch({ control, name: 'vatRate' })
   // VAT is all-or-nothing: the company's standard rate, or waived.
   const vatRate = num(vatRateRaw) > 0 ? standardVat : 0
 
   const subtotal = watchedItems.reduce(
-    (sum, item) => sum + computeItem(item, products).lineTotal,
+    (sum, item) => sum + computeItem(item, materialProduct).lineTotal,
     0
   )
   const cappedDiscount = Math.min(discount, subtotal)
@@ -260,8 +274,9 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
     mutationFn: ({ asDraft, data }) => {
       const payload = {
         customerId: Number(data.customerId),
+        materialProductId: data.materialProductId ? Number(data.materialProductId) : null,
+        materialType: materialProduct?.name || '',
         orderNumber: data.orderNumber || '',
-        materialType: data.materialType || '',
         orderedBy: data.orderedBy || '',
         orderedDate: data.orderedDate || null,
         projectName: data.projectName || '',
@@ -274,14 +289,13 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
         remark: data.remark || '',
         notes: data.notes || undefined,
         items: data.items.map((i) => {
-          const isLinear = i.itemType === 'linear'
+          const hasWidth = i.width !== '' && i.width != null && num(i.width) > 0
           return {
-            itemType: i.itemType,
             description: i.description,
-            productId: i.productId ? Number(i.productId) : null,
             length: num(i.length),
-            width: isLinear ? null : num(i.width),
-            thickness: isLinear || !i.thickness ? null : num(i.thickness),
+            width: hasWidth ? num(i.width) : null,
+            // Entered in centimetres, sent in millimetres.
+            thickness: !hasWidth || !i.thickness ? null : num(i.thickness) * 10,
             quantity: num(i.quantity) || 1,
             unitPrice: num(i.unitPrice),
             remark: i.remark || '',
@@ -297,13 +311,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   })
 
   const lockedStatus = ['approved', 'supervisor_approved'].includes(existing?.status)
-
-  // Every line pre-cleared means the proforma is approved on submission.
-  const allDirect =
-    watchedItems.length > 0 &&
-    watchedItems.every((i) =>
-      products.find((p) => sameId(p.id, i?.productId))?.allowsDirectApproval === true
-    )
+  const allDirect = watchedItems.length > 0 && materialProduct?.allowsDirectApproval === true
 
   return (
     <div className="w-full">
@@ -312,8 +320,15 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
       </Button>
       <PageHeader
         title={isEdit ? `Edit ${existing?.proformaNumber || 'Proforma'}` : 'New Proforma'}
-        description="Areas and amounts are recalculated automatically from the dimensions"
+        description="Total length, area and amount are calculated automatically"
       />
+
+      {/* Description suggestions, shared by every row */}
+      <datalist id="element-types">
+        {[...(meta?.elementTypes || []), ...(meta?.linearServices || [])].map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
 
       <form className="space-y-6">
         <Card>
@@ -332,12 +347,36 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
               {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Order No.</Label>
-              <Input {...register('orderNumber')} placeholder="Customer's order reference" />
+              <Label>Material Type *</Label>
+              <Select
+                {...register('materialProductId', {
+                  required: 'Select the material',
+                  onChange: (e) => {
+                    // Default every blank price to the chosen stone's rate.
+                    const prod = products.find((p) => sameId(p.id, e.target.value))
+                    if (!prod) return
+                    watchedItems.forEach((it, idx) => {
+                      if (it?.unitPrice === '' || it?.unitPrice == null) {
+                        setValue(`items.${idx}.unitPrice`, prod.defaultUnitPrice)
+                      }
+                    })
+                  },
+                })}
+              >
+                <option value="">Select material…</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {p.stoneCategory} ({p.finish})
+                  </option>
+                ))}
+              </Select>
+              {errors.materialProductId && (
+                <p className="text-xs text-destructive">{errors.materialProductId.message}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Material Type</Label>
-              <Input {...register('materialType')} placeholder="e.g. Harer Granite" />
+              <Label>Order No.</Label>
+              <Input {...register('orderNumber')} placeholder="Customer's order reference" />
             </div>
             <div className="space-y-1.5">
               <Label>Material Ordered by</Label>
@@ -369,34 +408,34 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Items</CardTitle>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ ...EMPTY_AREA_ITEM })}>
-                <Plus className="h-4 w-4" /> Cut stone
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ ...EMPTY_LINEAR_ITEM })}>
-                <Ruler className="h-4 w-4" /> Edge work
-              </Button>
-            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => append({ ...EMPTY_ITEM })}>
+              <Plus className="h-4 w-4" /> Add item
+            </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
+            <ItemsHeader />
             {fields.map((field, index) => (
               <ItemRow
                 key={field.id}
                 index={index}
                 control={control}
                 register={register}
-                remove={fields.length > 1 ? remove : () => {}}
-                products={products}
+                remove={remove}
+                canRemove={fields.length > 1}
+                materialProduct={materialProduct}
                 setValue={setValue}
                 meta={meta}
-                currency={currency}
               />
             ))}
+            <p className="pt-1 text-xs text-muted-foreground">
+              Leave <b>Width</b> empty for edge work such as Bullnose or Groove — those lines are
+              priced per linear metre of total length.
+            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Totals & Remarks</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Totals &amp; Remarks</CardTitle></CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-4">
@@ -454,7 +493,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
           <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
             <Zap className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-              Every item is a pre-approved product, so this proforma will be approved
+              {materialProduct.name} is a pre-approved product, so this proforma will be approved
               immediately on submission — no supervisor or admin review needed.
             </p>
           </div>
