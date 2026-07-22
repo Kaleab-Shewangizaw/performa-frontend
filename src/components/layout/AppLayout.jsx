@@ -5,6 +5,7 @@ import {
   BarChart3, Settings, UserCog, LogOut, Menu, X, Mountain,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useBranding } from '@/hooks/useCrud'
 import { cn, ROLE_LABELS } from '@/lib/utils'
 import { NotificationBell } from './NotificationBell'
 
@@ -21,16 +22,27 @@ const NAV = [
 
 function SidebarContent({ onNavigate }) {
   const { user, role } = useAuth()
+  const { data: branding } = useBranding()
   const items = NAV.filter((item) => item.roles.includes(role))
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-white/10 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-          <Mountain className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-white">Granite Factory</p>
-          <p className="text-xs text-slate-400">Proforma System</p>
+      <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-4">
+        {branding?.logoUrl ? (
+          <img
+            src={branding.logoUrl}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5"
+          />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+            <Mountain className="h-5 w-5 text-white" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold leading-tight text-white">
+            {branding?.companyName || 'Proforma System'}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">Proforma System</p>
         </div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">

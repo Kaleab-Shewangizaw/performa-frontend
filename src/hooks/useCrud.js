@@ -43,3 +43,13 @@ export function useSettings() {
     staleTime: 5 * 60_000,
   })
 }
+
+// Company name + logo, readable before sign-in.
+export function useBranding() {
+  return useQuery({
+    queryKey: ['branding'],
+    queryFn: () => api.get('/settings/public').then((r) => r.data.branding),
+    staleTime: 10 * 60_000,
+    retry: false,
+  })
+}

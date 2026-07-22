@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { Mountain } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
+import { useBranding } from '@/hooks/useCrud'
 import { apiErrorMessage } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 export default function LoginPage() {
   const { login } = useAuth()
+  const { data: branding } = useBranding()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const { register, handleSubmit, formState: { errors } } = useForm()
@@ -32,10 +34,18 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[#152a45] p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Mountain className="h-6 w-6 text-white" />
-          </div>
-          <CardTitle className="text-xl">Granite Factory</CardTitle>
+          {branding?.logoUrl ? (
+            <img
+              src={branding.logoUrl}
+              alt=""
+              className="mx-auto mb-2 h-16 w-auto max-w-[180px] object-contain"
+            />
+          ) : (
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+              <Mountain className="h-6 w-6 text-white" />
+            </div>
+          )}
+          <CardTitle className="text-lg">{branding?.companyName || 'Proforma System'}</CardTitle>
           <CardDescription>Proforma Management System</CardDescription>
         </CardHeader>
         <CardContent>

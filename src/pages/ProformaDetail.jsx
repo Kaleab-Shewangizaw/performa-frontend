@@ -20,6 +20,12 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 
+// Measurements print at their natural precision (0.868, not 0.87).
+function trim(n) {
+  if (n === null || n === undefined) return '—'
+  return String(Number(Number(n).toFixed(4)))
+}
+
 const ACTION_LABELS = {
   created: 'created this proforma as a draft',
   submitted: 'submitted for approval',
@@ -199,6 +205,18 @@ export default function ProformaDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
+            <CardHeader><CardTitle>Order Details</CardTitle></CardHeader>
+            <CardContent className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+              {proforma.orderNumber && <p><span className="text-muted-foreground">Order no: </span>{proforma.orderNumber}</p>}
+              {proforma.materialType && <p><span className="text-muted-foreground">Material type: </span>{proforma.materialType}</p>}
+              {proforma.orderedBy && <p><span className="text-muted-foreground">Ordered by: </span>{proforma.orderedBy}</p>}
+              {proforma.orderedDate && <p><span className="text-muted-foreground">Ordered date: </span>{formatDate(proforma.orderedDate)}</p>}
+              {proforma.projectName && <p><span className="text-muted-foreground">Project: </span>{proforma.projectName}</p>}
+              {proforma.deliveryTime && <p><span className="text-muted-foreground">Delivery date: </span>{proforma.deliveryTime}</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
             <CardHeader><CardTitle>Customer</CardTitle></CardHeader>
             <CardContent className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
               <p><span className="text-muted-foreground">Name: </span>{c.fullName}</p>
@@ -220,38 +238,53 @@ export default function ProformaDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">W×H (m)</TableHead>
-                    <TableHead className="text-right">Area m²</TableHead>
-                    <TableHead className="text-right">Thk</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Size L×W (m)</TableHead>
+                    <TableHead className="text-right">Thk (cm)</TableHead>
+                    <TableHead className="text-right">Tot. Len (m)</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Price/m²</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Tot. Area m²</TableHead>
+                    <TableHead className="text-right">Unit Price</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Remark</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {proforma.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <p className="font-medium">{item.productName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.stoneCategory} · {item.stoneColor} · {item.finish}
-                        </p>
-                      </TableCell>
-                      <TableCell className="text-right">{item.width} × {item.height}</TableCell>
-                      <TableCell className="text-right">{item.area.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">{item.thickness}mm</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">{Number(item.unitPrice).toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-medium">{Number(item.lineTotal).toLocaleString()}</TableCell>
-                    </TableRow>
-                  ))}
+                  {proforma.items.map((item) => {
+                    const isLinear = item.itemType === 'linear'
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <p className="font-medium">{item.description || item.productName}</p>
+                          {(item.productName || item.finish) && (
+                            <p className="text-xs text-muted-foreground">
+                              {[item.productName, item.finish].filter(Boolean).join(' · ')}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isLinear ? '—' : `${trim(item.length)} × ${trim(item.width)}`}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isLinear || item.thickness == null ? '—' : `${item.thickness / 10}`}
+                        </TableCell>
+                        <TableCell className="text-right">{trim(item.totalLength)}</TableCell>
+                        <TableCell className="text-right">{isLinear ? '—' : item.quantity}</TableCell>
+                        <TableCell className="text-right">{isLinear ? '—' : trim(item.area)}</TableCell>
+                        <TableCell className="text-right">{Number(item.unitPrice).toLocaleString()}</TableCell>
+                        <TableCell className="text-right font-medium">{Number(item.lineTotal).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {item.remark || (isLinear ? 'per linear m' : '')}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
               <div className="flex justify-end border-t p-4">
                 <div className="w-64 space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">Total Amount</span>
                     <span>{formatMoney(proforma.subtotal, currency)}</span>
                   </div>
                   {proforma.discount > 0 && (
@@ -261,11 +294,11 @@ export default function ProformaDetailPage() {
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">VAT ({proforma.vatRate}%)</span>
+                    <span className="text-muted-foreground">{proforma.vatRate}% VAT</span>
                     <span>{formatMoney(proforma.vatAmount, currency)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-1 text-base font-bold">
-                    <span>Grand Total</span>
+                    <span>Total incl. VAT</span>
                     <span>{formatMoney(proforma.grandTotal, currency)}</span>
                   </div>
                 </div>
@@ -284,6 +317,8 @@ export default function ProformaDetailPage() {
               {proforma.paymentTerms && <p><span className="text-muted-foreground">Payment: </span>{proforma.paymentTerms}</p>}
               {proforma.deliveryTime && <p><span className="text-muted-foreground">Delivery: </span>{proforma.deliveryTime}</p>}
               {proforma.validityPeriod && <p><span className="text-muted-foreground">Validity: </span>{proforma.validityPeriod}</p>}
+              {proforma.totalWeight && <p><span className="text-muted-foreground">Total weight: </span>{proforma.totalWeight}</p>}
+              {proforma.remark && <p><span className="text-muted-foreground">Remark: </span>{proforma.remark}</p>}
               {proforma.notes && <p><span className="text-muted-foreground">Notes: </span>{proforma.notes}</p>}
             </CardContent>
           </Card>

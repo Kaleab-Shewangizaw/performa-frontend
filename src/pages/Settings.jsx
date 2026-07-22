@@ -1,5 +1,6 @@
 import { useForm } from 'react-hook-form'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useSettings, useApiMutation } from '@/hooks/useCrud'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -14,7 +15,22 @@ export default function SettingsPage() {
   const { data: settings, isLoading } = useSettings()
   const queryClient = useQueryClient()
 
-  const { register, handleSubmit } = useForm({ values: settings })
+  const { register, handleSubmit, setValue, watch } = useForm({ values: settings })
+  const logoUrl = watch('logoUrl')
+
+  // Logos are stored inline as data URLs so the PDF renderer needs no file store.
+  const onLogoPick = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 400_000) {
+      toast.error('Logo is too large — please use an image under 400 KB')
+      e.target.value = ''
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setValue('logoUrl', String(reader.result), { shouldDirty: true })
+    reader.readAsDataURL(file)
+  }
 
   const mutation = useApiMutation({
     mutationFn: (data) =>
@@ -71,12 +87,26 @@ export default function SettingsPage() {
               <Input {...register('currency')} />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Logo (data URL or leave empty)</Label>
-              <Textarea
-                {...register('logoUrl')}
-                placeholder="data:image/png;base64,..."
-                className="font-mono text-xs"
-              />
+              <Label>Company Logo</Label>
+              <div className="flex items-center gap-4">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Company logo"
+                    className="h-16 w-auto max-w-[160px] rounded border bg-white object-contain p-1"
+                  />
+                ) : (
+                  <div className="flex h-16 w-24 items-center justify-center rounded border text-xs text-muted-foreground">
+                    No logo
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Input type="file" accept="image/png,image/jpeg" onChange={onLogoPick} className="h-auto py-1.5" />
+                  <p className="text-xs text-muted-foreground">
+                    PNG or JPEG, ideally under 200 KB. Appears on the proforma PDF.
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -102,6 +132,35 @@ export default function SettingsPage() {
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Default Payment Terms</Label>
               <Input {...register('defaultPaymentTerms')} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Proforma Footer</CardTitle>
+            <CardDescription>Printed at the bottom of every proforma — one item per line</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Terms and Conditions</Label>
+              <Textarea
+                rows={4}
+                {...register('termsAndConditions')}
+                placeholder={"50% advance payment\nValid for 15 days from the date of issue"}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Our Products</Label>
+              <Textarea
+                rows={4}
+                {...register('productsOffered')}
+                placeholder={'Granite\nMarble\nLimestone'}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bank Details</Label>
+              <Textarea rows={3} {...register('bankDetails')} placeholder="Bank name, account name, account number" />
             </div>
           </CardContent>
         </Card>
