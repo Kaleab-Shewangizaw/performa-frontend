@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users as UsersIcon, Package, FileText, CheckSquare,
-  BarChart3, Settings, UserCog, LogOut, Menu, X, Mountain,
+  BarChart3, Settings, UserCog, LogOut, Menu, X, Mountain, Factory, ListChecks,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useBranding } from '@/hooks/useCrud'
@@ -15,8 +15,10 @@ const NAV = [
   { to: '/products', label: 'Products', icon: Package, roles: ['sales', 'supervisor', 'admin'] },
   { to: '/proformas', label: 'Proformas', icon: FileText, roles: ['sales', 'supervisor', 'admin'] },
   { to: '/approvals', label: 'Approvals', icon: CheckSquare, roles: ['supervisor', 'admin'] },
+  { to: '/orders', label: 'Production', icon: Factory, roles: ['factory', 'admin'] },
   { to: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin'] },
   { to: '/users', label: 'Users', icon: UserCog, roles: ['admin'] },
+  { to: '/order-steps', label: 'Order steps', icon: ListChecks, roles: ['admin'] },
   { to: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ]
 

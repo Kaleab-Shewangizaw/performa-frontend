@@ -19,7 +19,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { TableSkeleton } from '@/components/ui/skeleton'
 
-const ROLE_VARIANTS = { admin: 'default', supervisor: 'info', sales: 'secondary' }
+const ROLE_VARIANTS = { admin: 'default', supervisor: 'info', sales: 'secondary', factory: 'warning' }
 
 function UserFormDialog({ open, onClose, user }) {
   const isEdit = !!user
@@ -62,6 +62,7 @@ function UserFormDialog({ open, onClose, user }) {
             <option value="sales">Sales</option>
             <option value="supervisor">Supervisor</option>
             <option value="admin">Admin</option>
+            <option value="factory">Factory</option>
           </Select>
         </div>
         <div className="space-y-1.5">
