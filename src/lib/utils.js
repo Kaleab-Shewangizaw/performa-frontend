@@ -39,4 +39,5 @@ export const ROLE_LABELS = {
   sales: 'Sales',
   supervisor: 'Supervisor',
   admin: 'Admin',
+  factory: 'Factory',
 }
