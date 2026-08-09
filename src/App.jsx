@@ -15,6 +15,7 @@ import UsersPage from '@/pages/Users'
 import SettingsPage from '@/pages/Settings'
 import OrderStepsPage from '@/pages/OrderSteps'
 import FactoryOrdersPage from '@/pages/FactoryOrders'
+import FactoryOrderDetailPage from '@/pages/FactoryOrderDetail'
 
 function RequireAuth() {
   const { isAuthenticated } = useAuth()
@@ -55,6 +56,7 @@ export default function App() {
         </Route>
         <Route element={<RequireRole roles={['factory', 'admin']} />}>
           <Route path="/orders" element={<FactoryOrdersPage />} />
+          <Route path="/orders/:id" element={<FactoryOrderDetailPage />} />
         </Route>
         <Route element={<RequireRole roles={['admin']} />}>
           <Route path="/order-steps" element={<OrderStepsPage />} />
