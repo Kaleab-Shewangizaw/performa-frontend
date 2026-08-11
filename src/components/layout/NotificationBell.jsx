@@ -75,7 +75,10 @@ export function NotificationBell() {
                 onClick={() => {
                   if (!n.read) markRead.mutate(n.id)
                   setOpen(false)
-                  if (n.proforma) navigate(`/proformas/${n.proforma}`)
+                  // Order notifications point at the factory order; the rest at the proforma.
+                  if (n.proforma) {
+                    navigate(n.type?.startsWith('order_') ? `/orders/${n.proforma}` : `/proformas/${n.proforma}`)
+                  }
                 }}
                 className={cn(
                   'block w-full border-b px-4 py-3 text-left text-sm last:border-0 hover:bg-accent cursor-pointer',
