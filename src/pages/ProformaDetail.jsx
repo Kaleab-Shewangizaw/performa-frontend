@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowLeft, FileDown, Pencil, Trash2, Check, X, Send, History, Zap,
+  ArrowLeft, FileDown, Pencil, Trash2, Check, X, Send, History, Zap, Factory,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, apiErrorMessage, storage } from '@/lib/api'
@@ -112,6 +112,11 @@ export default function ProformaDetailPage() {
     successMessage: 'Proforma deleted',
     onSuccess: () => navigate('/proformas'),
   })
+  const sendToFactoryMutation = useApiMutation({
+    mutationFn: () => api.post(`/proformas/${id}/send-to-factory`),
+    invalidate,
+    successMessage: 'Sent to the factory',
+  })
 
   const downloadPdf = async () => {
     setDownloading(true)
@@ -152,6 +157,9 @@ export default function ProformaDetailPage() {
     (isSupervisor && proforma.status === 'pending') ||
     (isAdmin && ['pending', 'supervisor_approved', 'approved'].includes(proforma.status))
   const canDelete = isAdmin || (isSales && isOwner && proforma.status === 'draft')
+  // Approved but not yet handed to the factory: admin/supervisor can send it.
+  const canSendToFactory =
+    (isAdmin || isSupervisor) && proforma.status === 'approved' && !proforma.currentStep
 
   return (
     <div className="w-full">
@@ -189,6 +197,11 @@ export default function ProformaDetailPage() {
               <X className="h-4 w-4" /> Reject
             </Button>
           )}
+          {canSendToFactory && (
+            <Button onClick={() => sendToFactoryMutation.mutate()} loading={sendToFactoryMutation.isPending}>
+              <Factory className="h-4 w-4" /> Send to factory
+            </Button>
+          )}
           {canDelete && (
             <Button variant="ghost" size="icon" onClick={() => setDeleting(true)}>
               <Trash2 className="h-4 w-4 text-destructive" />
@@ -201,6 +214,17 @@ export default function ProformaDetailPage() {
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <span className="font-semibold">Rejection reason: </span>
           {proforma.rejectionReason}
+        </div>
+      )}
+
+      {proforma.currentStep && (
+        <div className="mb-6 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <Factory className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            <span className="font-semibold">In production. </span>
+            This order is on the factory floor — current stage:{' '}
+            <span className="font-semibold">{proforma.currentStep.name}</span>.
+          </p>
         </div>
       )}
 
