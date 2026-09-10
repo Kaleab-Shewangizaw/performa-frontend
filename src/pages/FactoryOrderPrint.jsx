@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Printer, ArrowLeft } from 'lucide-react'
-import { api } from '@/lib/api'
+import { Printer, ArrowLeft, FileDown } from 'lucide-react'
+import { toast } from 'sonner'
+import { api, apiErrorMessage, storage } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -16,6 +17,7 @@ function trim(n) {
 export default function FactoryOrderPrintPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [downloading, setDownloading] = useState(false)
 
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ['order', id],
@@ -29,6 +31,24 @@ export default function FactoryOrderPrintPage() {
     }
   }, [order])
 
+  const downloadPdf = async () => {
+    setDownloading(true)
+    try {
+      const res = await fetch(`/api/proformas/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${storage.accessToken}` },
+      })
+      if (!res.ok) throw new Error('Failed to generate PDF')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      toast.error(apiErrorMessage(err))
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   if (isLoading) return <div className="p-10 text-sm text-muted-foreground">Loading…</div>
   if (isError || !order) return <div className="p-10 text-sm text-destructive">Order not found.</div>
 
@@ -40,9 +60,14 @@ export default function FactoryOrderPrintPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate(`/orders/${id}`)}>
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button size="sm" onClick={() => window.print()}>
-          <Printer className="h-4 w-4" /> Print
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={downloadPdf} loading={downloading}>
+            <FileDown className="h-4 w-4" /> PDF
+          </Button>
+          <Button size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4" /> Print
+          </Button>
+        </div>
       </div>
 
       <div className="border-b-2 border-black pb-3">

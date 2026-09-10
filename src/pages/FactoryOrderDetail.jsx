@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Clock, Printer, Check, X, Hourglass } from 'lucide-react'
-import { api } from '@/lib/api'
+import { ArrowLeft, Clock, Printer, FileDown, Check, X, Hourglass } from 'lucide-react'
+import { toast } from 'sonner'
+import { api, apiErrorMessage, storage } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { useList, useApiMutation } from '@/hooks/useCrud'
 import { formatDate } from '@/lib/utils'
@@ -56,7 +57,26 @@ export default function FactoryOrderDetailPage() {
   const [stepId, setStepId] = useState('')
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
+  const [downloading, setDownloading] = useState(false)
   useEffect(() => { setStepId(nextStepId) }, [nextStepId])
+
+  const downloadPdf = async () => {
+    setDownloading(true)
+    try {
+      const res = await fetch(`/api/proformas/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${storage.accessToken}` },
+      })
+      if (!res.ok) throw new Error('Failed to generate PDF')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      toast.error(apiErrorMessage(err))
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const selectedPos = steps.find((s) => s.id === Number(stepId))?.position ?? null
   const isBackward = currentPos != null && selectedPos != null && selectedPos < currentPos
@@ -91,9 +111,14 @@ export default function FactoryOrderDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/orders')}>
           <ArrowLeft className="h-4 w-4" /> Production queue
         </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate(`/orders/${id}/print`)}>
-          <Printer className="h-4 w-4" /> Print
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={downloadPdf} loading={downloading}>
+            <FileDown className="h-4 w-4" /> PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate(`/orders/${id}/print`)}>
+            <Printer className="h-4 w-4" /> Print
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 flex items-center gap-3">
