@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, useFieldArray, useWatch } from 'react-hook-form'
 import { useQuery } from '@tanstack/react-query'
@@ -22,7 +22,7 @@ const EMPTY_ITEM = {
 // Column widths shared by the header strip and every item row, so the grid
 // lines up like a spreadsheet.
 const GRID =
-  'grid grid-cols-1 gap-2 md:grid-cols-[minmax(130px,1.7fr)_minmax(62px,0.7fr)_minmax(62px,0.7fr)_minmax(64px,0.7fr)_minmax(72px,0.8fr)_minmax(52px,0.5fr)_minmax(76px,0.8fr)_minmax(88px,1fr)_minmax(96px,1.05fr)_minmax(110px,1.2fr)_32px] md:items-center md:gap-1.5'
+  'grid grid-cols-1 gap-2 md:grid-cols-[minmax(120px,1.4fr)_minmax(84px,1fr)_minmax(84px,1fr)_minmax(62px,0.7fr)_minmax(72px,0.8fr)_minmax(48px,0.5fr)_minmax(76px,0.8fr)_minmax(84px,1fr)_minmax(92px,1fr)_minmax(100px,1.1fr)_68px] md:items-center md:gap-1.5'
 
 function num(v) {
   const n = Number(v)
@@ -68,7 +68,7 @@ function ItemsHeader() {
   )
 }
 
-function ItemRow({ index, control, register, remove, materialProduct, setValue, meta, canRemove }) {
+function ItemRow({ index, control, register, remove, insert, materialProduct, setValue, meta, canRemove }) {
   const item = useWatch({ control, name: `items.${index}` })
   const { isLinear, totalLength, area, lineTotal } = computeItem(item, materialProduct)
 
@@ -157,11 +157,15 @@ function ItemRow({ index, control, register, remove, materialProduct, setValue, 
 
       <div>
         <span className={mobileLabel}>Remark</span>
-        <Input placeholder="Bullnose and Groove" className="h-9"
+        <Input list="remark-options" placeholder="Bullnose and Groove" className="h-9"
           {...register(`items.${index}.remark`)} />
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-1">
+        <Button type="button" variant="ghost" size="icon" className="h-9 w-8"
+          title="Insert item above" onClick={() => insert(index, { ...EMPTY_ITEM })}>
+          <Plus className="h-4 w-4" />
+        </Button>
         <Button type="button" variant="ghost" size="icon" className="h-9 w-8"
           disabled={!canRemove} onClick={() => remove(index)}>
           <Trash2 className="h-4 w-4 text-destructive" />
@@ -216,6 +220,26 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   const currency = settings?.currency || 'ETB'
   const standardVat = settings?.defaultVatRate ?? 15
 
+  // Auto-save: a new proforma is drafted to this device as it's typed, so a
+  // power cut or an accidental close doesn't lose the work. Read once at mount.
+  const DRAFT_KEY = isEdit ? null : 'proforma-draft:new'
+  const draftRef = useRef(undefined)
+  if (draftRef.current === undefined) {
+    let saved = null
+    if (DRAFT_KEY) {
+      try { saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null') } catch { saved = null }
+    }
+    draftRef.current = saved
+  }
+  const [draftRestored, setDraftRestored] = useState(!!draftRef.current)
+
+  const blankValues = {
+    customerId: '', materialProductId: '', orderNumber: '', orderedBy: '', orderedDate: '',
+    projectName: '', discount: 0, vatRate: standardVat, paymentTerms: '', deliveryTime: '',
+    expiryDate: '', totalWeight: '', remark: '', notes: '',
+    items: [{ ...EMPTY_ITEM }],
+  }
+
   const defaultValues = existing
     ? {
         customerId: existing.customer?.id ?? '',
@@ -228,7 +252,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
         vatRate: existing.vatRate,
         paymentTerms: existing.paymentTerms,
         deliveryTime: existing.deliveryTime,
-        validityPeriod: existing.validityPeriod,
+        expiryDate: existing.expiryDate ? String(existing.expiryDate).slice(0, 10) : '',
         totalWeight: existing.totalWeight || '',
         remark: existing.remark || '',
         notes: existing.notes || '',
@@ -243,17 +267,38 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
           remark: i.remark || '',
         })),
       }
-    : {
-        customerId: '', materialProductId: '', orderNumber: '', orderedBy: '', orderedDate: '',
-        projectName: '', discount: 0, vatRate: standardVat, paymentTerms: '', deliveryTime: '',
-        validityPeriod: '', totalWeight: '', remark: '', notes: '',
-        items: [{ ...EMPTY_ITEM }],
-      }
+    : (draftRef.current || blankValues)
 
-  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, setValue, watch, getValues, formState: { errors } } = useForm({
     values: defaultValues,
   })
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  // Sales used to have to make up the next "Order No." themselves. On a fresh
+  // (non-restored) new proforma, suggest the next one instead — still editable
+  // for a real customer PO reference. Never touches an edit or a restored draft.
+  const { data: nextOrderNumber } = useQuery({
+    queryKey: ['next-order-number'],
+    queryFn: () => api.get('/proformas/next-order-number').then((r) => r.data.nextOrderNumber),
+    enabled: !isEdit && !draftRestored,
+  })
+  useEffect(() => {
+    if (nextOrderNumber == null) return
+    if (!getValues('orderNumber')) setValue('orderNumber', nextOrderNumber)
+  }, [nextOrderNumber, getValues, setValue])
+
+  // Persist the in-progress new proforma to this device (throttled).
+  useEffect(() => {
+    if (!DRAFT_KEY) return
+    let t
+    const sub = watch((values) => {
+      clearTimeout(t)
+      t = setTimeout(() => {
+        try { localStorage.setItem(DRAFT_KEY, JSON.stringify(values)) } catch { /* quota */ }
+      }, 700)
+    })
+    return () => { clearTimeout(t); sub.unsubscribe() }
+  }, [watch, DRAFT_KEY])
+  const { fields, append, remove, insert } = useFieldArray({ control, name: 'items' })
   const watchedItems = useWatch({ control, name: 'items' }) || []
   const materialProductId = useWatch({ control, name: 'materialProductId' })
   const materialProduct = products.find((p) => sameId(p.id, materialProductId))
@@ -270,6 +315,16 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
   const vatAmount = (subtotal - cappedDiscount) * (vatRate / 100)
   const grandTotal = subtotal - cappedDiscount + vatAmount
 
+  // Running totals shown at the bottom of the form and stored on the proforma.
+  const totalLengthAll = watchedItems.reduce((s, it) => s + computeItem(it, materialProduct).totalLength, 0)
+  const totalAreaAll = watchedItems.reduce((s, it) => s + computeItem(it, materialProduct).area, 0)
+  // Weight in quintals ("Kuntal"): 0.27 per m² per cm of thickness.
+  const totalWeightQuintal = watchedItems.reduce(
+    (s, it) => s + computeItem(it, materialProduct).area * num(it?.thickness) * 0.27,
+    0
+  )
+  const totalWeightLabel = totalWeightQuintal ? `${totalWeightQuintal.toFixed(2)} Kuntal` : ''
+
   const mutation = useApiMutation({
     mutationFn: ({ asDraft, data }) => {
       const payload = {
@@ -284,8 +339,8 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
         vatRate: num(data.vatRate) > 0 ? standardVat : 0,
         paymentTerms: data.paymentTerms || undefined,
         deliveryTime: data.deliveryTime || undefined,
-        validityPeriod: data.validityPeriod || undefined,
-        totalWeight: data.totalWeight || '',
+        expiryDate: data.expiryDate || undefined,
+        totalWeight: totalWeightLabel,
         remark: data.remark || '',
         notes: data.notes || undefined,
         items: data.items.map((i) => {
@@ -307,7 +362,10 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
     },
     invalidate: ['proformas', 'proforma', 'dashboard'],
     successMessage: isEdit ? 'Proforma updated' : 'Proforma created',
-    onSuccess: (res) => navigate(`/proformas/${res.data.proforma.id}`),
+    onSuccess: (res) => {
+      if (DRAFT_KEY) { try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ } }
+      navigate(`/proformas/${res.data.proforma.id}`)
+    },
   })
 
   const lockedStatus = ['approved', 'supervisor_approved'].includes(existing?.status)
@@ -320,14 +378,37 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
       </Button>
       <PageHeader
         title={isEdit ? `Edit ${existing?.proformaNumber || 'Proforma'}` : 'New Proforma'}
-        description="Total length, area and amount are calculated automatically"
+        description="Total length, area, weight and amount are calculated automatically"
       />
+
+      {draftRestored && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          <span>Restored your unsaved draft from this device.</span>
+          <button
+            type="button"
+            className="font-medium underline"
+            onClick={() => {
+              try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+              window.location.reload()
+            }}
+          >
+            Start fresh
+          </button>
+        </div>
+      )}
 
       {/* Description suggestions, shared by every row */}
       <datalist id="element-types">
         {[...(meta?.elementTypes || []), ...(meta?.linearServices || [])].map((s) => (
           <option key={s} value={s} />
         ))}
+      </datalist>
+      {/* Edge-work presets for the Remark column */}
+      <datalist id="remark-options">
+        <option value="Bullnose" />
+        <option value="Groove" />
+        <option value="Bullnose and Groove" />
+        <option value="Both side Bullnose and Groove" />
       </datalist>
 
       <form className="space-y-6">
@@ -377,6 +458,11 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
             <div className="space-y-1.5">
               <Label>Order No.</Label>
               <Input {...register('orderNumber')} placeholder="Customer's order reference" />
+              {!isEdit && (
+                <p className="text-[11px] text-muted-foreground">
+                  Auto-filled with the next number — edit it if there's a specific customer reference.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Material Ordered by</Label>
@@ -399,8 +485,9 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
               <Input {...register('paymentTerms')} placeholder={settings?.defaultPaymentTerms} />
             </div>
             <div className="space-y-1.5">
-              <Label>Validity Period</Label>
-              <Input {...register('validityPeriod')} placeholder={`${settings?.defaultValidityDays ?? 15} days`} />
+              <Label>Valid until</Label>
+              <Input type="date" {...register('expiryDate')} />
+              <p className="text-[11px] text-muted-foreground">Shown as “Valid until” on the PDF. Leave blank for the default period.</p>
             </div>
           </CardContent>
         </Card>
@@ -413,20 +500,25 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
             </Button>
           </CardHeader>
           <CardContent className="space-y-2">
-            <ItemsHeader />
-            {fields.map((field, index) => (
-              <ItemRow
-                key={field.id}
-                index={index}
-                control={control}
-                register={register}
-                remove={remove}
-                canRemove={fields.length > 1}
-                materialProduct={materialProduct}
-                setValue={setValue}
-                meta={meta}
-              />
-            ))}
+            <div className="md:overflow-x-auto">
+              <div className="space-y-2 md:min-w-[900px]">
+                <ItemsHeader />
+                {fields.map((field, index) => (
+                  <ItemRow
+                    key={field.id}
+                    index={index}
+                    control={control}
+                    register={register}
+                    remove={remove}
+                    insert={insert}
+                    canRemove={fields.length > 1}
+                    materialProduct={materialProduct}
+                    setValue={setValue}
+                    meta={meta}
+                  />
+                ))}
+              </div>
+            </div>
             <p className="pt-1 text-xs text-muted-foreground">
               Leave <b>Width</b> empty for edge work such as Bullnose or Groove — those lines are
               priced per linear metre of total length.
@@ -453,8 +545,11 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Total weight</Label>
-                  <Input {...register('totalWeight')} placeholder="e.g. 50 Kuntal" />
+                  <Label>Total weight (auto)</Label>
+                  <div className="flex h-9 items-center rounded-md bg-muted px-3 text-sm font-medium tabular-nums">
+                    {totalWeightLabel || '—'}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">0.27 Kuntal per m² per cm of thickness.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Remark</Label>
@@ -467,6 +562,18 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
               </div>
               <div className="h-fit space-y-1 rounded-lg bg-muted p-4 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total length (m)</span>
+                  <span className="font-medium tabular-nums">{trim(totalLengthAll, 3)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total area (m²)</span>
+                  <span className="font-medium tabular-nums">{trim(totalAreaAll)}</span>
+                </div>
+                <div className="flex justify-between border-b pb-1.5">
+                  <span className="text-muted-foreground">Total weight</span>
+                  <span className="font-medium tabular-nums">{totalWeightLabel || '—'}</span>
+                </div>
+                <div className="flex justify-between pt-0.5">
                   <span className="text-muted-foreground">Total Amount</span>
                   <span className="font-medium">{formatMoney(subtotal, currency)}</span>
                 </div>

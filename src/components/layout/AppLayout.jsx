@@ -20,7 +20,7 @@ const NAV = [
   { to: '/approvals', label: 'Approvals', icon: CheckSquare, roles: ['supervisor', 'admin'] },
   { to: '/awaiting-dispatch', label: 'Awaiting dispatch', icon: Send, roles: ['supervisor', 'admin'], badge: 'dispatch' },
   { to: '/orders', label: 'Production', icon: Factory, roles: ['factory', 'supervisor', 'admin'] },
-  { to: '/step-requests', label: 'Step requests', icon: ClipboardList, roles: ['supervisor', 'admin'], badge: 'requests' },
+  { to: '/step-requests', label: 'Step requests', icon: ClipboardList, roles: ['admin'], badge: 'requests' },
   { to: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin'] },
   { to: '/users', label: 'Users', icon: UserCog, roles: ['admin'] },
   { to: '/order-steps', label: 'Order steps', icon: ListChecks, roles: ['admin'] },
