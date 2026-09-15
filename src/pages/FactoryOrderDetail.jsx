@@ -143,16 +143,8 @@ export default function FactoryOrderDetailPage() {
 
           <Card>
             <CardHeader><CardTitle>Customer</CardTitle></CardHeader>
-            <CardContent className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+            <CardContent className="text-sm">
               <p><span className="text-muted-foreground">Name: </span>{c.fullName}</p>
-              {c.companyName && <p><span className="text-muted-foreground">Company: </span>{c.companyName}</p>}
-              {c.phone && <p><span className="text-muted-foreground">Phone: </span>{c.phone}</p>}
-              {(c.address || c.city) && (
-                <p className="sm:col-span-2">
-                  <span className="text-muted-foreground">Address: </span>
-                  {[c.address, c.city].filter(Boolean).join(', ')}
-                </p>
-              )}
             </CardContent>
           </Card>
 

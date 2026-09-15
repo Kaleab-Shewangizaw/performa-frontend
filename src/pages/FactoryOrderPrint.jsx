@@ -79,15 +79,11 @@ export default function FactoryOrderPrintPage() {
         <p><b>Order:</b> {order.proformaNumber}</p>
         <p><b>Stage:</b> {order.currentStep?.name || '—'}</p>
         <p><b>Customer:</b> {c.fullName}</p>
-        {c.phone && <p><b>Phone:</b> {c.phone}</p>}
         {order.projectName && <p><b>Project:</b> {order.projectName}</p>}
         {order.materialType && <p><b>Material:</b> {order.materialType}</p>}
         {order.orderedDate && <p><b>Ordered:</b> {formatDate(order.orderedDate)}</p>}
         {order.deliveryTime && <p><b>Delivery:</b> {order.deliveryTime}</p>}
         {order.totalArea > 0 && <p><b>Total area:</b> {trim(order.totalArea)} m²</p>}
-        {(c.address || c.city) && (
-          <p className="col-span-2"><b>Address:</b> {[c.address, c.city].filter(Boolean).join(', ')}</p>
-        )}
       </div>
 
       <h2 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide">Items to produce</h2>
