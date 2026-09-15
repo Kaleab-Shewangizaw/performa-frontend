@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const EMPTY_ITEM = {
   description: '', length: '', width: '', thickness: '',
-  quantity: 1, unitPrice: '', remark: '',
+  quantity: 1, unitPrice: '', remark: '', bothSides: false,
 }
 
 // Column widths shared by the header strip and every item row, so the grid
@@ -30,10 +30,12 @@ function num(v) {
 }
 
 // Mirrors the server: a line with no width is edge work billed per metre.
+// Groove cut on both sides of the piece doubles the billed length.
 function computeItem(item, product) {
   const quantity = num(item?.quantity) || 0
-  const totalLength = num(item?.length) * quantity
   const isLinear = item?.width === '' || item?.width == null || num(item?.width) === 0
+  const bothSides = isLinear && !!item?.bothSides
+  const totalLength = num(item?.length) * quantity * (bothSides ? 2 : 1)
   const area = isLinear ? 0 : num(item?.length) * num(item?.width) * quantity
   const unitPrice =
     item?.unitPrice !== '' && item?.unitPrice != null
@@ -159,6 +161,12 @@ function ItemRow({ index, control, register, remove, insert, materialProduct, se
         <span className={mobileLabel}>Remark</span>
         <Input list="remark-options" placeholder="Bullnose and Groove" className="h-9"
           {...register(`items.${index}.remark`)} />
+        {isLinear && (
+          <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" className="h-3.5 w-3.5" {...register(`items.${index}.bothSides`)} />
+            Both sides (groove) — doubles billed length
+          </label>
+        )}
       </div>
 
       <div className="flex justify-end gap-1">
@@ -265,6 +273,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           remark: i.remark || '',
+          bothSides: i.bothSides || false,
         })),
       }
     : (draftRef.current || blankValues)
@@ -354,6 +363,7 @@ function ProformaFormInner({ id, isEdit, existing, customers, products, settings
             quantity: num(i.quantity) || 1,
             unitPrice: num(i.unitPrice),
             remark: i.remark || '',
+            bothSides: !hasWidth && !!i.bothSides,
           }
         }),
         ...(isEdit ? { submit: !asDraft } : { asDraft }),

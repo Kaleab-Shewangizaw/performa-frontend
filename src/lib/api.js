@@ -4,21 +4,23 @@ const TOKEN_KEY = 'performa.accessToken'
 const REFRESH_KEY = 'performa.refreshToken'
 const USER_KEY = 'performa.user'
 
+// sessionStorage, not localStorage: the session must not survive the tab
+// closing, for every role.
 export const storage = {
-  get accessToken() { return localStorage.getItem(TOKEN_KEY) },
-  get refreshToken() { return localStorage.getItem(REFRESH_KEY) },
+  get accessToken() { return sessionStorage.getItem(TOKEN_KEY) },
+  get refreshToken() { return sessionStorage.getItem(REFRESH_KEY) },
   get user() {
-    try { return JSON.parse(localStorage.getItem(USER_KEY)) } catch { return null }
+    try { return JSON.parse(sessionStorage.getItem(USER_KEY)) } catch { return null }
   },
   setSession({ accessToken, refreshToken, user }) {
-    localStorage.setItem(TOKEN_KEY, accessToken)
-    localStorage.setItem(REFRESH_KEY, refreshToken)
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
+    sessionStorage.setItem(TOKEN_KEY, accessToken)
+    sessionStorage.setItem(REFRESH_KEY, refreshToken)
+    sessionStorage.setItem(USER_KEY, JSON.stringify(user))
   },
   clear() {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(REFRESH_KEY)
-    localStorage.removeItem(USER_KEY)
+    sessionStorage.removeItem(TOKEN_KEY)
+    sessionStorage.removeItem(REFRESH_KEY)
+    sessionStorage.removeItem(USER_KEY)
   },
 }
 

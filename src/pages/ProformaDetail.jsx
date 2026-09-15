@@ -310,7 +310,9 @@ export default function ProformaDetailPage() {
                         <TableCell className="text-right">{Number(item.unitPrice).toLocaleString()}</TableCell>
                         <TableCell className="text-right font-medium">{Number(item.lineTotal).toLocaleString()}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {item.remark || (isLinear ? 'per linear m' : '')}
+                          {[item.remark || (isLinear ? 'per linear m' : ''), item.bothSides ? 'both sides' : '']
+                            .filter(Boolean)
+                            .join(' · ')}
                         </TableCell>
                       </TableRow>
                     )
@@ -353,6 +355,7 @@ export default function ProformaDetailPage() {
               {proforma.paymentTerms && <p><span className="text-muted-foreground">Payment: </span>{proforma.paymentTerms}</p>}
               {proforma.deliveryTime && <p><span className="text-muted-foreground">Delivery: </span>{proforma.deliveryTime}</p>}
               {proforma.validityPeriod && <p><span className="text-muted-foreground">Validity: </span>{proforma.validityPeriod}</p>}
+              {proforma.totalArea > 0 && <p><span className="text-muted-foreground">Total area: </span>{trim(proforma.totalArea)} m²</p>}
               {proforma.totalWeight && <p><span className="text-muted-foreground">Total weight: </span>{proforma.totalWeight}</p>}
               {proforma.remark && <p><span className="text-muted-foreground">Remark: </span>{proforma.remark}</p>}
               {proforma.notes && <p><span className="text-muted-foreground">Notes: </span>{proforma.notes}</p>}
