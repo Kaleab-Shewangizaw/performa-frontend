@@ -136,6 +136,7 @@ export default function FactoryOrderDetailPage() {
               {order.projectName && <p><span className="text-muted-foreground">Project: </span>{order.projectName}</p>}
               {order.orderedDate && <p><span className="text-muted-foreground">Ordered: </span>{formatDate(order.orderedDate)}</p>}
               {order.deliveryTime && <p><span className="text-muted-foreground">Delivery: </span>{order.deliveryTime}</p>}
+              {order.totalArea > 0 && <p><span className="text-muted-foreground">Total area: </span>{trim(order.totalArea)} m²</p>}
               {order.totalWeight && <p><span className="text-muted-foreground">Total weight: </span>{order.totalWeight}</p>}
             </CardContent>
           </Card>
@@ -189,7 +190,11 @@ export default function FactoryOrderDetailPage() {
                           <TableCell className="text-right">{trim(item.totalLength)}</TableCell>
                           <TableCell className="text-right">{isLinear ? '—' : item.quantity}</TableCell>
                           <TableCell className="text-right">{isLinear ? '—' : trim(item.area)}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{item.remark || (isLinear ? 'per linear m' : '')}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {[item.remark || (isLinear ? 'per linear m' : ''), item.bothSides ? 'both sides' : '']
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </TableCell>
                         </TableRow>
                       )
                     })}

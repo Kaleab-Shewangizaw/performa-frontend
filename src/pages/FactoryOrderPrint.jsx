@@ -84,6 +84,7 @@ export default function FactoryOrderPrintPage() {
         {order.materialType && <p><b>Material:</b> {order.materialType}</p>}
         {order.orderedDate && <p><b>Ordered:</b> {formatDate(order.orderedDate)}</p>}
         {order.deliveryTime && <p><b>Delivery:</b> {order.deliveryTime}</p>}
+        {order.totalArea > 0 && <p><b>Total area:</b> {trim(order.totalArea)} m²</p>}
         {(c.address || c.city) && (
           <p className="col-span-2"><b>Address:</b> {[c.address, c.city].filter(Boolean).join(', ')}</p>
         )}
@@ -118,7 +119,11 @@ export default function FactoryOrderPrintPage() {
                 <td className="py-1.5 pr-2 text-right">{isLinear || item.thickness == null ? '—' : item.thickness / 10}</td>
                 <td className="py-1.5 pr-2 text-right">{isLinear ? '—' : item.quantity}</td>
                 <td className="py-1.5 pr-2 text-right">{isLinear ? '—' : trim(item.area)}</td>
-                <td className="py-1.5">{item.remark || (isLinear ? 'per linear m' : '')}</td>
+                <td className="py-1.5">
+                  {[item.remark || (isLinear ? 'per linear m' : ''), item.bothSides ? 'both sides' : '']
+                    .filter(Boolean)
+                    .join(' · ')}
+                </td>
               </tr>
             )
           })}
